@@ -5,6 +5,7 @@ import 'package:quzhi_app/components/address_page.dart';
 import 'package:quzhi_app/components/agreement_page.dart';
 import 'package:provider/provider.dart';
 import 'package:quzhi_app/providers/app_provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MinePage extends StatefulWidget {
   const MinePage({super.key});
@@ -16,6 +17,41 @@ class MinePage extends StatefulWidget {
 class _MinePageState extends State<MinePage> {
   bool _showAddress = false;
   String? _showAgreement;
+  bool _isLoggingOut = false;
+
+  Future<void> _logout() async {
+    setState(() => _isLoggingOut = true);
+    await context.read<AppProvider>().logout();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认注销'),
+        content: const Text('注销账号后数据将无法恢复，确定要注销吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('确认注销'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _logout();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,12 +107,18 @@ class _MinePageState extends State<MinePage> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(32),
-                                child: Image.network(
-                                  userState.avatar,
+                                child: CachedNetworkImage(
+                                  imageUrl: userState.avatar,
                                   width: 64,
                                   height: 64,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
+                                  placeholder: (_, __) => Container(
+                                    width: 64,
+                                    height: 64,
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.person, size: 32, color: Colors.white),
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
                                     width: 64,
                                     height: 64,
                                     color: Colors.grey[300],
@@ -105,7 +147,7 @@ class _MinePageState extends State<MinePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(userState.nickname,
+                                Text(userState.nickname.isNotEmpty ? userState.nickname : '未设置昵称',
                                     style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 20,
@@ -143,7 +185,7 @@ class _MinePageState extends State<MinePage> {
                                     style: TextStyle(
                                         color: Colors.white.withOpacity(0.7),
                                         fontSize: 12)),
-                                Text(userState.inviteCode,
+                                Text(userState.inviteCode.isNotEmpty ? userState.inviteCode : '-',
                                     style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 18,
@@ -253,7 +295,7 @@ class _MinePageState extends State<MinePage> {
               _MenuItem(icon: Icons.favorite, label: '我的收藏', color: Colors.red),
             ]),
             _buildMenuGroup('推广中心', [
-              _MenuItem(icon: Icons.share, label: '邀请好友', value: '邀请7人', color: Colors.purple),
+              _MenuItem(icon: Icons.share, label: '邀请好友', value: '邀请${userState.inviteCount}人', color: Colors.purple),
               _MenuItem(icon: Icons.card_giftcard, label: '奖励活动', value: '新活动', color: AppTheme.brand),
               _MenuItem(icon: Icons.trending_up, label: '推广数据', color: Colors.green),
             ]),
@@ -281,10 +323,7 @@ class _MinePageState extends State<MinePage> {
               child: Column(
                 children: [
                   OutlinedButton(
-                    onPressed: () {
-                      context.read<AppProvider>().logout();
-                      Navigator.pushReplacementNamed(context, '/login');
-                    },
+                    onPressed: _isLoggingOut ? null : _deleteAccount,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 48),
                       side: const BorderSide(
@@ -293,13 +332,15 @@ class _MinePageState extends State<MinePage> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text('注销账号',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 14)),
+                    child: _isLoggingOut
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEF4444)))
+                        : const Text('注销账号',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 14)),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
-                    onPressed: () {},
+                    onPressed: _isLoggingOut ? null : _logout,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 48),
                       side: BorderSide(color: Colors.grey[300]!),

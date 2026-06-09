@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:quzhi_app/models/app_models.dart';
 import 'package:quzhi_app/data/mock_data.dart';
 import 'package:quzhi_app/utils/theme.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ContentCard extends StatelessWidget {
   final ContentItem item;
@@ -29,12 +30,17 @@ class ContentCard extends StatelessWidget {
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image.network(
-                item.image,
+              child: CachedNetworkImage(
+                imageUrl: item.image,
                 height: 130,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                placeholder: (_, __) => Container(
+                  height: 130,
+                  color: Colors.grey[200],
+                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+                errorWidget: (_, __, ___) => Container(
                   height: 130,
                   color: Colors.grey[200],
                   child: const Icon(Icons.image, color: Colors.grey),

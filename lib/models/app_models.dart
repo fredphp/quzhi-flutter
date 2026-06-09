@@ -11,6 +11,10 @@ class ContentItem {
   final int likes;
   final int views;
   final String? height;
+  final String? body;
+  final bool isLiked;
+  final bool isBookmarked;
+  final int? categoryId;
 
   const ContentItem({
     required this.id,
@@ -21,7 +25,75 @@ class ContentItem {
     required this.likes,
     required this.views,
     this.height,
+    this.body,
+    this.isLiked = false,
+    this.isBookmarked = false,
+    this.categoryId,
   });
+
+  ContentItem copyWith({
+    String? id,
+    String? category,
+    String? title,
+    String? summary,
+    String? image,
+    int? likes,
+    int? views,
+    String? height,
+    String? body,
+    bool? isLiked,
+    bool? isBookmarked,
+    int? categoryId,
+  }) {
+    return ContentItem(
+      id: id ?? this.id,
+      category: category ?? this.category,
+      title: title ?? this.title,
+      summary: summary ?? this.summary,
+      image: image ?? this.image,
+      likes: likes ?? this.likes,
+      views: views ?? this.views,
+      height: height ?? this.height,
+      body: body ?? this.body,
+      isLiked: isLiked ?? this.isLiked,
+      isBookmarked: isBookmarked ?? this.isBookmarked,
+      categoryId: categoryId ?? this.categoryId,
+    );
+  }
+
+  factory ContentItem.fromJson(Map<String, dynamic> json) {
+    return ContentItem(
+      id: (json['id'] ?? '').toString(),
+      category: json['category'] ?? json['category_name'] ?? '',
+      title: json['title'] ?? '',
+      summary: json['summary'] ?? json['description'] ?? '',
+      image: json['image'] ?? json['cover'] ?? '',
+      likes: json['likes'] ?? json['like_count'] ?? 0,
+      views: json['views'] ?? json['view_count'] ?? 0,
+      height: json['height']?.toString(),
+      body: json['body'] ?? json['content'],
+      isLiked: json['is_liked'] ?? json['isLiked'] ?? false,
+      isBookmarked: json['is_bookmarked'] ?? json['isBookmarked'] ?? false,
+      categoryId: json['category_id'] ?? json['categoryId'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'category': category,
+      'title': title,
+      'summary': summary,
+      'image': image,
+      'likes': likes,
+      'views': views,
+      'height': height,
+      'body': body,
+      'isLiked': isLiked,
+      'isBookmarked': isBookmarked,
+      'category_id': categoryId,
+    };
+  }
 }
 
 /// Mall product model
@@ -32,6 +104,9 @@ class MallProduct {
   final String image;
   final String? tag;
   final int stock;
+  final int? categoryId;
+  final String? description;
+  final int sales;
 
   const MallProduct({
     required this.id,
@@ -40,7 +115,62 @@ class MallProduct {
     required this.image,
     this.tag,
     required this.stock,
+    this.categoryId,
+    this.description,
+    this.sales = 0,
   });
+
+  MallProduct copyWith({
+    String? id,
+    String? name,
+    int? points,
+    String? image,
+    String? tag,
+    int? stock,
+    int? categoryId,
+    String? description,
+    int? sales,
+  }) {
+    return MallProduct(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      points: points ?? this.points,
+      image: image ?? this.image,
+      tag: tag ?? this.tag,
+      stock: stock ?? this.stock,
+      categoryId: categoryId ?? this.categoryId,
+      description: description ?? this.description,
+      sales: sales ?? this.sales,
+    );
+  }
+
+  factory MallProduct.fromJson(Map<String, dynamic> json) {
+    return MallProduct(
+      id: (json['id'] ?? '').toString(),
+      name: json['name'] ?? json['title'] ?? '',
+      points: json['points'] ?? json['coin'] ?? json['price'] ?? 0,
+      image: json['image'] ?? json['cover'] ?? '',
+      tag: json['tag'] ?? json['label'],
+      stock: json['stock'] ?? json['nums'] ?? 0,
+      categoryId: json['category_id'] ?? json['categoryId'],
+      description: json['description'] ?? json['desc'],
+      sales: json['sales'] ?? json['sale_count'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'points': points,
+      'image': image,
+      'tag': tag,
+      'stock': stock,
+      'category_id': categoryId,
+      'description': description,
+      'sales': sales,
+    };
+  }
 }
 
 /// Ad state model
@@ -74,6 +204,26 @@ class AdState {
       lastBannerTime: lastBannerTime ?? this.lastBannerTime,
     );
   }
+
+  factory AdState.fromJson(Map<String, dynamic> json) {
+    return AdState(
+      interstitialCount: json['interstitialCount'] ?? json['interstitial_count'] ?? 0,
+      rewardCount: json['rewardCount'] ?? json['reward_count'] ?? 10,
+      lastInterstitialTime: json['lastInterstitialTime'] ?? json['last_interstitial_time'] ?? 0,
+      lastRewardTime: json['lastRewardTime'] ?? json['last_reward_time'] ?? 0,
+      lastBannerTime: json['lastBannerTime'] ?? json['last_banner_time'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'interstitialCount': interstitialCount,
+      'rewardCount': rewardCount,
+      'lastInterstitialTime': lastInterstitialTime,
+      'lastRewardTime': lastRewardTime,
+      'lastBannerTime': lastBannerTime,
+    };
+  }
 }
 
 /// User state model
@@ -85,15 +235,17 @@ class UserState {
   final String inviteCode;
   final int inviteCount;
   final int todayEarned;
+  final String? token;
 
   const UserState({
-    this.points = 1280,
-    this.uid = 'U88612345',
-    this.nickname = '积分达人',
-    this.avatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80',
-    this.inviteCode = 'JF88612',
-    this.inviteCount = 7,
-    this.todayEarned = 320,
+    this.points = 0,
+    this.uid = '',
+    this.nickname = '',
+    this.avatar = '',
+    this.inviteCode = '',
+    this.inviteCount = 0,
+    this.todayEarned = 0,
+    this.token,
   });
 
   UserState copyWith({
@@ -104,6 +256,7 @@ class UserState {
     String? inviteCode,
     int? inviteCount,
     int? todayEarned,
+    String? token,
   }) {
     return UserState(
       points: points ?? this.points,
@@ -113,7 +266,34 @@ class UserState {
       inviteCode: inviteCode ?? this.inviteCode,
       inviteCount: inviteCount ?? this.inviteCount,
       todayEarned: todayEarned ?? this.todayEarned,
+      token: token ?? this.token,
     );
+  }
+
+  factory UserState.fromJson(Map<String, dynamic> json) {
+    return UserState(
+      points: json['score'] ?? json['points'] ?? json['coin'] ?? 0,
+      uid: (json['id'] ?? '').toString(),
+      nickname: json['nickname'] ?? json['username'] ?? '',
+      avatar: json['avatar'] ?? '',
+      inviteCode: json['invite_code'] ?? json['inviteCode'] ?? '',
+      inviteCount: json['invite_count'] ?? json['inviteCount'] ?? 0,
+      todayEarned: json['today_earned'] ?? json['todayEarned'] ?? 0,
+      token: json['token'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'score': points,
+      'id': uid,
+      'nickname': nickname,
+      'avatar': avatar,
+      'invite_code': inviteCode,
+      'invite_count': inviteCount,
+      'today_earned': todayEarned,
+      'token': token,
+    };
   }
 }
 
@@ -147,6 +327,30 @@ class AppNotification {
       read: read ?? this.read,
       points: points,
     );
+  }
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    return AppNotification(
+      id: (json['id'] ?? '').toString(),
+      type: json['type'] ?? '',
+      title: json['title'] ?? '',
+      body: json['body'] ?? json['content'] ?? '',
+      time: json['time'] ?? json['createtime'] ?? json['created_at'] ?? '',
+      read: json['is_read'] ?? json['read'] ?? false,
+      points: json['points'] ?? json['score'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type,
+      'title': title,
+      'body': body,
+      'time': time,
+      'is_read': read,
+      'points': points,
+    };
   }
 }
 
@@ -193,13 +397,77 @@ class Address {
       isDefault: isDefault ?? this.isDefault,
     );
   }
+
+  factory Address.fromJson(Map<String, dynamic> json) {
+    return Address(
+      id: (json['id'] ?? '').toString(),
+      name: json['name'] ?? '',
+      phone: json['phone'] ?? json['mobile'] ?? '',
+      province: json['province'] ?? '',
+      city: json['city'] ?? '',
+      district: json['district'] ?? json['area'] ?? '',
+      detail: json['detail'] ?? json['address'] ?? '',
+      isDefault: json['isDefault'] ?? json['is_default'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'phone': phone,
+      'province': province,
+      'city': city,
+      'district': district,
+      'detail': detail,
+      'isDefault': isDefault,
+    };
+  }
 }
 
 /// Category model
 class Category {
+  final int? id;
   final String key;
   final String label;
   final String emoji;
 
-  const Category({required this.key, required this.label, required this.emoji});
+  const Category({
+    this.id,
+    required this.key,
+    required this.label,
+    required this.emoji,
+  });
+
+  Category copyWith({
+    int? id,
+    String? key,
+    String? label,
+    String? emoji,
+  }) {
+    return Category(
+      id: id ?? this.id,
+      key: key ?? this.key,
+      label: label ?? this.label,
+      emoji: emoji ?? this.emoji,
+    );
+  }
+
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+      id: json['id'],
+      key: (json['id'] ?? json['key'] ?? '').toString(),
+      label: json['label'] ?? json['name'] ?? json['title'] ?? '',
+      emoji: json['emoji'] ?? json['icon'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'key': key,
+      'label': label,
+      'emoji': emoji,
+    };
+  }
 }

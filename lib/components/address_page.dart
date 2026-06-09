@@ -23,8 +23,16 @@ class _AddressPageState extends State<AddressPage> {
   final _districtController = TextEditingController();
   final _detailController = TextEditingController();
   bool _isDefault = false;
+  bool _isSaving = false;
 
-  static const _provinces = ['广东省', '北京市', '上海市', '浙江省', '江苏省', '四川省', '湖北省', '湖南省', '河南省', '山东省'];
+  @override
+  void initState() {
+    super.initState();
+    // Load addresses when page opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AddressProvider>().loadAddresses();
+    });
+  }
 
   void _openAdd() {
     _editingId = null;
@@ -50,8 +58,9 @@ class _AddressPageState extends State<AddressPage> {
     setState(() => _showForm = true);
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_nameController.text.isEmpty || _phoneController.text.isEmpty || _detailController.text.isEmpty) return;
+    setState(() => _isSaving = true);
     final provider = context.read<AddressProvider>();
     final addr = Address(
       id: _editingId ?? DateTime.now().millisecondsSinceEpoch.toString(),
@@ -63,17 +72,29 @@ class _AddressPageState extends State<AddressPage> {
       detail: _detailController.text,
       isDefault: _isDefault,
     );
+    bool success;
     if (_editingId != null) {
-      provider.updateAddress(addr);
+      success = await provider.updateAddress(addr);
     } else {
-      provider.addAddress(addr);
+      success = await provider.addAddress(addr);
     }
-    setState(() => _showForm = false);
+    if (!mounted) return;
+    setState(() {
+      _isSaving = false;
+      if (success) _showForm = false;
+    });
+    if (!success && mounted) {
+      final msg = provider.errorMessage ?? '保存失败，请重试';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final addresses = context.watch<AddressProvider>().addresses;
+    final addressProvider = context.watch<AddressProvider>();
+    final addresses = addressProvider.addresses;
 
     return Stack(
       children: [
@@ -142,128 +163,135 @@ class _AddressPageState extends State<AddressPage> {
 
             // Address list
             Expanded(
-              child: addresses.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.map, size: 64, color: Colors.grey.withOpacity(0.3)),
-                          const SizedBox(height: 16),
-                          Text('暂无收货地址', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _openAdd,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.brand,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                            ),
-                            child: const Text('添加地址'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: addresses.map((addr) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: AppTheme.cardDecoration(),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(addr.name,
-                                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                                    const SizedBox(width: 8),
-                                    Text(addr.phone,
-                                        style: TextStyle(color: Colors.grey[500], fontSize: 14)),
-                                    if (addr.isDefault) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          gradient: AppTheme.brandGradient,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: const Text('默认',
-                                            style: TextStyle(color: Colors.white, fontSize: 10)),
-                                      ),
-                                    ],
-                                    const Spacer(),
-                                    GestureDetector(
-                                      onTap: () => context.read<AddressProvider>().deleteAddress(addr.id),
-                                      child: Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF5F5F5),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: const Icon(Icons.delete, size: 16, color: Colors.red),
-                                      ),
+              child: addressProvider.isLoading && addresses.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: () => addressProvider.loadAddresses(),
+                      child: addresses.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.map, size: 64, color: Colors.grey.withOpacity(0.3)),
+                                  const SizedBox(height: 16),
+                                  Text('暂无收货地址', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _openAdd,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.brand,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text('${addr.province} ${addr.city} ${addr.district} ${addr.detail}',
-                                    style: TextStyle(color: Colors.grey[500], fontSize: 14, height: 1.4)),
-                                const SizedBox(height: 12),
-                                const Divider(height: 1),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () => context.read<AddressProvider>().setDefault(addr.id),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: addr.isDefault ? AppTheme.brand : Colors.grey[300]!,
-                                          ),
-                                          borderRadius: BorderRadius.circular(20),
-                                          color: addr.isDefault ? const Color(0xFFFFF3E0) : null,
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
+                                    child: const Text('添加地址'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.all(16),
+                              children: addresses.map((addr) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: AppTheme.cardDecoration(),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            Icon(Icons.check, size: 12, color: addr.isDefault ? AppTheme.brand : Colors.grey),
-                                            const SizedBox(width: 4),
-                                            Text(addr.isDefault ? '已设默认' : '设为默认',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: addr.isDefault ? AppTheme.brand : Colors.grey)),
+                                            Text(addr.name,
+                                                style: const TextStyle(fontWeight: FontWeight.w700)),
+                                            const SizedBox(width: 8),
+                                            Text(addr.phone,
+                                                style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                                            if (addr.isDefault) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  gradient: AppTheme.brandGradient,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: const Text('默认',
+                                                    style: TextStyle(color: Colors.white, fontSize: 10)),
+                                              ),
+                                            ],
+                                            const Spacer(),
+                                            GestureDetector(
+                                              onTap: () async {
+                                                await context.read<AddressProvider>().deleteAddress(addr.id);
+                                              },
+                                              child: Container(
+                                                width: 32,
+                                                height: 32,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF5F5F5),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: const Icon(Icons.delete, size: 16, color: Colors.red),
+                                              ),
+                                            ),
                                           ],
                                         ),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    GestureDetector(
-                                      onTap: () => _openEdit(addr),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(color: Colors.grey[300]!),
-                                          borderRadius: BorderRadius.circular(20),
+                                        const SizedBox(height: 4),
+                                        Text('${addr.province} ${addr.city} ${addr.district} ${addr.detail}',
+                                            style: TextStyle(color: Colors.grey[500], fontSize: 14, height: 1.4)),
+                                        const SizedBox(height: 12),
+                                        const Divider(height: 1),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () => context.read<AddressProvider>().setDefault(addr.id),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                    color: addr.isDefault ? AppTheme.brand : Colors.grey[300]!,
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  color: addr.isDefault ? const Color(0xFFFFF3E0) : null,
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.check, size: 12, color: addr.isDefault ? AppTheme.brand : Colors.grey),
+                                                    const SizedBox(width: 4),
+                                                    Text(addr.isDefault ? '已设默认' : '设为默认',
+                                                        style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.w500,
+                                                            color: addr.isDefault ? AppTheme.brand : Colors.grey)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            GestureDetector(
+                                              onTap: () => _openEdit(addr),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(color: Colors.grey[300]!),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text('编辑',
+                                                    style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: Colors.grey[500])),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        child: Text('编辑',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                                color: Colors.grey[500])),
-                                      ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ],
+                                  ),
+                                );
+                              }).toList(),
                             ),
-                          ),
-                        );
-                      }).toList(),
                     ),
             ),
           ],
@@ -349,13 +377,15 @@ class _AddressPageState extends State<AddressPage> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _save,
+                    onPressed: _isSaving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.brand,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text('保存地址', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    child: _isSaving
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('保存地址', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                   ),
                 ),
               ],

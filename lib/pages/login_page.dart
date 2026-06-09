@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quzhi_app/providers/app_provider.dart';
+import 'package:quzhi_app/api/api_service.dart';
 import 'package:quzhi_app/utils/theme.dart';
 
 class LoginPage extends StatefulWidget {
@@ -46,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  void _sendCode() {
+  Future<void> _sendCode() async {
     if (!_isPhoneValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入正确的手机号')),
@@ -60,7 +61,8 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
     setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 800), () {
+    try {
+      await ApiService.sendSms(mobile: _phone);
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -70,10 +72,17 @@ class _LoginPageState extends State<LoginPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('验证码已发送至 ${_phone.substring(0, 3)}****${_phone.substring(7)}')),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final msg = e.toString().replaceAll('ApiException(', '').replaceAll('): ', ': ').replaceAll(')', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg.isNotEmpty ? msg : '发送验证码失败，请稍后重试')),
+      );
+    }
   }
 
-  void _verify() {
+  Future<void> _verify() async {
     String code = _codeControllers.map((c) => c.text).join();
     if (code.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -82,12 +91,17 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
     setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      context.read<AppProvider>().login();
+    final success = await context.read<AppProvider>().login(_phone, code);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (success) {
       Navigator.pushReplacementNamed(context, '/');
-    });
+    } else {
+      final error = context.read<AppProvider>().errorMessage ?? '登录失败，请重试';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
   }
 
   @override
@@ -433,7 +447,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 )
               : GestureDetector(
-                  onTap: _startCountdown,
+                  onTap: _sendCode,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -447,22 +461,6 @@ class _LoginPageState extends State<LoginPage> {
                     ],
                   ),
                 ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF3E0),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.shield, size: 16, color: AppTheme.brand),
-              SizedBox(width: 8),
-              Text('测试环境输入任意6位数字即可登录',
-                  style: TextStyle(fontSize: 12, color: AppTheme.brand)),
-            ],
-          ),
         ),
         const SizedBox(height: 20),
         SizedBox(
